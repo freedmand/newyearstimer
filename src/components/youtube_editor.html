@@ -261,7 +261,7 @@
       verify() {
         const random = JSON.parse(localStorage.getItem('newyearstimer-redditPost')).random;
 
-        const url = `https://www.reddit.com/api/v1/authorize?client_id=${API_KEYS.redditClient}&response_type=code&state=${random}&redirect_uri=http%3A%2F%2Flocalhost%3A5000&duration=temporary&scope=submit,vote`;
+        const url = `https://www.reddit.com/api/v1/authorize?client_id=${API_KEYS.redditClient}&response_type=code&state=${random}&redirect_uri=${encodeURIComponent(API_KEYS.redditRedirect)}&duration=temporary&scope=submit,vote`;
         window.open(url);
       },
 
@@ -274,7 +274,7 @@
             'Content-type': 'application/x-www-form-urlencoded',
             'Authorization': 'basic ' + btoa(`${API_KEYS.redditClient}:${API_KEYS.redditSecret}`),
           },
-          body: `grant_type=authorization_code&code=${this.store.get('code')}&redirect_uri=${API_KEYS.redditRedirect}`,
+          body: `grant_type=authorization_code&code=${this.store.get('code')}&redirect_uri=${encodeURIComponent(API_KEYS.redditRedirect)}`,
         }).then((response) => {
           if (response.status != 200) {
             this.showAuthFailed();

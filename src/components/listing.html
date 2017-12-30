@@ -102,7 +102,7 @@
             'Content-type': 'application/x-www-form-urlencoded',
             'Authorization': 'basic ' + btoa(`${API_KEYS.redditClient}:${API_KEYS.redditSecret}`),
           },
-          body: `grant_type=authorization_code&code=${this.store.get('code')}&redirect_uri=${API_KEYS.redditRedirect}`,
+          body: `grant_type=authorization_code&code=${encodeURIComponent(this.store.get('code'))}&redirect_uri=${encodeURIComponent(API_KEYS.redditRedirect)}`,
         }).then((response) => {
           if (response.status != 200) {
             this.showAuthFailed();

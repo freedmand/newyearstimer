@@ -129,7 +129,7 @@
         const random = `${Math.random()}`;
         localStorage.setItem('newyearstimer-redditVote', JSON.stringify({random}));
 
-        const url = `https://www.reddit.com/api/v1/authorize?client_id=${API_KEYS.redditClient}&response_type=code&state=${random}&redirect_uri=http%3A%2F%2Flocalhost%3A5000&duration=temporary&scope=submit,vote`;
+        const url = `https://www.reddit.com/api/v1/authorize?client_id=${API_KEYS.redditClient}&response_type=code&state=${random}&redirect_uri=${encodeURIComponent(API_KEYS.redditRedirect)}&duration=temporary&scope=submit,vote`;
         window.open(url);
       },
       block(event) {

@@ -6,7 +6,7 @@
 </div>
 <Clock ref:clock :trigger :showInfo :playing :testTrigger/>
 <div>
-  <div class='{{blurry ? "blurFg" : ""}}'></div>
+  <div class='{{blurry || ($timerBegin && playerState == 2) ? "blurFg" : ""}}'></div>
   {{#if $timerBegin && playerState == 2}}
     <div class="playerMessage" on:click="refs.player.play()">
       <p>
@@ -49,7 +49,7 @@
   {{elseif specificCount == 0}}
     <div class="specificCount small">Happy New Year</div>
   {{/if}}
-  <YouTubePlayer ref:player id="{{$playbackId}}" controls=0 mute=true loop=1 blurry="{{blurry || ($timerBegin && playerState == 2)}}"/>
+  <YouTubePlayer ref:player id="{{$playbackId}}" controls=0 mute=true loop="1"/>
 </div>
 
 <script>
