@@ -1,0 +1,48 @@
+{
+  "name": "new-years-timer",
+  "version": "0.0.1",
+  "description": "Ring in the New Year right.",
+  "scripts": {
+    "build": "BABEL_ENV=dev rollup -c && npm run && npm run postbuild",
+    "postbuild": "npm run copybuild && npm run cleanprod && npm run removemaps",
+    "copybuild": "rm -rf dist/* && cp -r public/ dist/",
+    "cleanprod": "rm dist/*.map",
+    "removemaps": "sed -i '' -e '/\\/\\/# sourceMappingURL.*/d' dist/bundle.js && sed -i '' -e '/\\/\\*# sourceMappingURL.*/d' dist/bundle.css",
+    "dev": "BABEL_ENV=dev serve public & rollup -c -w",
+    "start": "serve public",
+    "test": "BABEL_ENV=test ava"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/freedmand/new-years-timer.git"
+  },
+  "keywords": [
+    "new year",
+    "new years",
+    "new years eve",
+    "timer",
+    "countdown"
+  ],
+  "author": "Dylan Freedman",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/freedmand/new-years-timer/issues"
+  },
+  "homepage": "https://github.com/freedmand/new-years-timer#readme",
+  "devDependencies": {
+    "ava": "^0.24.0",
+    "babel-preset-env": "^1.6.1",
+    "rollup": "^0.53.0",
+    "rollup-plugin-babel": "^3.0.3",
+    "rollup-plugin-buble": "^0.18.0",
+    "rollup-plugin-commonjs": "^8.2.6",
+    "rollup-plugin-node-resolve": "^3.0.0",
+    "rollup-plugin-svelte": "^4.0.0",
+    "rollup-plugin-uglify": "^2.0.1",
+    "serve": "^6.4.3",
+    "svelte": "^1.49.3"
+  },
+  "dependencies": {
+    "fetchival": "^0.3.3"
+  }
+}

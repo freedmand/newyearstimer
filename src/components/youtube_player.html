@@ -1,0 +1,179 @@
+<div ref:player style='pointer-events: {{controls ? "inherit" : "none"}}'></div>
+
+<script>
+  import {API_KEYS} from '../config.js';
+
+  // Refresh current playing time every 200 milliseconds.
+  const TIME_REFRESH = 50;
+  // The factor of the height of a YouTube video relative to its width.
+  const HEIGHT_FACTOR = 1 / 1.66;
+  const MAX_WIDTH = 800;
+
+  // The number of milliseconds it's ok to be *off*.
+  const PERMISSIBLE_DELTA = 300;
+
+  export default {
+    data() {
+      return {
+        id: null,
+        ready: false, // If the YouTube player is ready.
+        player: null, // The YouTube player object.
+        /**
+         * -1 – unstarted
+         *  0 – ended
+         *  1 – playing
+         *  2 – paused
+         *  3 – buffering
+         *  5 – video cued
+         */
+        playerState: -1, // The state of the YouTube player. -1 = unstarted
+        currentTime: null, // The current playback time of the YouTube player.
+        loadedFraction: null, // The fraction of the video currently loaded.
+        playsinline: 1,
+        title: '',
+        controls: 1,
+        loop: 0,
+        mute: false,
+        sync: null, // If true, a start timestamp to sync to exactly.
+        clock: null,
+        autoplay: true,
+      };
+    },
+    oncreate() {
+      // The interval timer to update the YouTube playback time.
+      this.interval = null;
+
+      // A function to call after data like the YouTube title has been fetched.
+      const youTubePlayer = this; // backup this to use in dataFetched callback.
+      const dataFetched = function() {
+        try {
+          const title = JSON.parse(this.responseText).items[0].snippet.title;
+          if (title) youTubePlayer.set({title});
+        } catch (e) {
+          console.error('Could not grab YouTube title', e);
+        }
+      };
+
+      // Send a request to grab the title of the YouTube video.
+      const req = new XMLHttpRequest();
+      req.addEventListener('load', dataFetched);
+      req.open('GET', `https://content.googleapis.com/youtube/v3/videos?id=${this.get('id')}&part=snippet&key=${API_KEYS.ytdata}`);
+      req.send();
+
+      // A function to call after the YouTube API has been initialized.
+      const ytInitialized = () => {
+        const width = Math.min(document.body.offsetWidth, 800);
+        const player = new YT.Player(this.refs.player, {
+          width,
+          height: width * HEIGHT_FACTOR,
+          videoId: this.get('id'),
+          playerVars: {
+            autoplay: this.get('autoplay') == true ? 1 : 0, // Start playing right away.
+            rel: 0, // Do not show related videos at the end.
+            controls: this.get('controls'),
+            disablekb: this.get('controls') == 1 ? 0 : 1,
+            loop: this.get('loop'),
+          },
+          events: {
+            'onReady': (e) => {
+              const player = e.target
+              if (this.get('mute')) {
+                player.mute();
+              }
+              this.set({
+                ready: true,
+                player,
+              });
+              // Set the interval timer to update playback time.
+              this.interval = setInterval(() => {
+                const currentTime = player.getCurrentTime();
+                this.set({
+                  currentTime,
+                  loadedFraction: player.getVideoLoadedFraction(),
+                });
+                // If needed, sync.
+                const sync = this.get('sync');
+                if (sync != null && this.get('playerState') == 1) {
+                  const timestamp = this.get('clock').get('effectiveTime').getTime();
+                  const playerTime = currentTime * 1000 + sync;
+                  const delta = timestamp - playerTime;
+                  if (delta > PERMISSIBLE_DELTA) {
+                    this.seek(currentTime + delta / 1000);
+                  } else if (delta < -PERMISSIBLE_DELTA) {
+                    this.seek(currentTime + delta / 1000);
+                  }
+                }
+
+              }, TIME_REFRESH);
+              this.fire('loaded');
+            },
+            'onStateChange': (e) => {
+              this.set({
+                playerState: e.data,
+              });
+              this.fire('state');
+            },
+          },
+        });
+      };
+
+      if (this.store.get('yt') != null) {
+        ytInitialized();
+      }
+
+      // Load the YouTube API asynchronously.
+      const tag = document.createElement('script');
+      tag.src = "https://www.youtube.com/iframe_api";
+      const firstScriptTag = document.getElementsByTagName('script')[0];
+      firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+      window.onYouTubeIframeAPIReady = () => {
+        this.store.set({yt: window.YT});
+        // Call the YouTube initialized function to proceed initializing the
+        // player.
+        ytInitialized();
+      };
+
+      const resizeHandler = this.resize.bind(this);
+      window.addEventListener('resize', resizeHandler, false);
+      this.removeListener = () => window.removeEventListener('resize', resizeHandler, false);
+    },
+
+    ondestroy () {
+      if (this.interval != null) clearInterval(this.interval);
+
+      this.removeListener();
+    },
+
+    methods: {
+      pause: function() {
+        const player = this.get('player');
+        if (player != null) player.pauseVideo();
+      },
+      play: function() {
+        const player = this.get('player');
+        if (player != null) player.playVideo();
+        console.log('play');
+      },
+      seek: function(seconds) {
+        const player = this.get('player');
+        if (player != null) player.seekTo(seconds, true);
+      },
+      mute: function() {
+        const player = this.get('player');
+        if (player != null) player.mute();
+      },
+      unmute: function() {
+        const player = this.get('player');
+        if (player != null) player.unMute();
+      },
+      resize: function(e) {
+        const player = this.get('player');
+        if (player != null) {
+          const width = Math.min(document.body.offsetWidth, MAX_WIDTH);
+          player.setSize(width, width * HEIGHT_FACTOR);
+        }
+      },
+    },
+  };
+</script>

@@ -1,0 +1,451 @@
+{{#if $id !== null}}
+  <div class='editor {{$step != 1 ? "hidden" : ""}}'>
+    <div class="editorHeader editorContent">
+      <div class="back" on:click="stepHandler()">Go back</div>
+      <div class="step">Step 1 of 2</div>
+    </div>
+    <div class="editorInstructions editorContent">
+      {{#if loading}}
+        Loading YouTube video...
+      {{else}}
+        Pause the YouTube video at the moment you want to ring in the new year.
+      {{/if}}
+    </div>
+    <div class="editorPlayer">
+      <YouTubePlayer id="{{$id}}" ref:player on:loaded="setupHandler()" autoplay="{{$step == 1}}"/>
+    </div>
+    {{#if !loading}}
+      <div class="editorFooter editorContent">
+        <div class="editorInstructions">
+          {{#if !loading && countdown != '12:00:00' && countdown != ''}}
+            We will start the YouTube video at
+            <span class="timestamp">{{{countdown}}} p.m.</span> to ring in the
+            new year at the current moment in the video. Pause to proceed.
+          {{/if}}
+        </div>
+        <div class="editorNextStep">
+          <button disabled="{{!ready}}" on:click="nextStep()">Continue</button>
+        </div>
+      </div>
+    {{/if}}
+  </div>
+
+  {{#if $step == 2}}
+    <div class="editor">
+      <div class="editorHeader editorContent">
+        <div class="back" on:click="stepHandler()">Start over</div>
+        <div class="step">Step 2 of 2</div>
+      </div>
+      <div class="editorContent expanded">
+        <div class="success">
+          <div class="editorInstructions editorContent">
+            <h2 class="subheader">Success!</h2>
+            Your custom new year&rsquo;s timer has been created. Use this link to
+            run it and share with friends.
+          </div>
+          <div class="copyBox" on:click="selectUrl()" ref:link>
+            {{{link}}}
+          </div>
+        </div>
+      </div>
+      <div class="editorInstructions editorContent">
+        <h2 class="subheader">Post publicly</h2>
+        If you like, you can post your timer publicly. Others will be able to
+        find it on the homepage and vote on it. (A Reddit account is required to
+        post &mdash; the resulting post will also appear in
+        reddit.com/r/NewYearsTimer).
+      </div>
+      <div class="editorFooter editorContent">
+        <div class="editorInstructions">
+          <div class="inputRow">
+            <div class="inputTitle">Video title<sup>*</sup></div>
+            <input bind:value="title" placeholder="If a song, put title and artist">
+          </div>
+          <div class="inputRow">
+            <div class="inputTitle">What happens at the New Year&rsquo;s moment<sup>*</sup></div>
+            <input bind:value="event" placeholder='Put the event here, e.g. "the bass drops."'>
+          </div>
+          <div class="editorNextStep">
+            <button disabled="{{title.trim().length == 0 || event.trim().length == 0}}" on:click="post()">Post</button>
+          </div>
+          <div class="inputRow previewRow">
+            <div class="subheader">Preview</div>
+            <div class="preview">
+              <Post :title :event :countdown id="{{$id}}" disabled="true"/>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  {{/if}}
+  {{#if $step == 3}}
+    <div class="editor">
+      <div class="editorHeader editorContent">
+        <div class="back" on:click="stepHandler()">Back</div>
+        <div class="step">Verification</div>
+      </div>
+      <div class="editorInstructions editorContent">
+        <h2 class="subheader">Verify your Reddit account</h2>
+        <p>
+          New Year&rsquo;s Timer posts for you in the subreddit <a href="https://reddit.com/r/NewYearsTimer" target="blank_">/r/NewYearsTimer</a>.
+          This subreddit&rsquo;s contents are displayed on this site&rsquo;s
+          homepage. In order to submit your post, we need to verify your Reddit
+          account and secure permissions to post and vote (in case you want to
+          vote on other&rsquo;s submissions from the homepage).
+        </p>
+        <p>
+          You may close this window after you click the &ldquo;Verify&rdquo;
+          button.
+        </p>
+        <p>
+          <button on:click="verify()">Continue</button>
+        </p>
+      </div>
+    </div>
+  {{/if}}
+  {{#if $step == 4}}
+    <div class="editor">
+      <div class="editorHeader editorContent">
+        <div class="step">Posting...</div>
+      </div>
+    </div>
+  {{/if}}
+  {{#if $step == 5}}
+    <div class="editor">
+      <div class="editorHeader editorContent">
+        <div class="back" on:click="stepHandler()">Try again</div>
+        <div class="step">Authentication failed</div>
+      </div>
+    </div>
+  {{/if}}
+  {{#if $step == 6}}
+    <div class="editor">
+      <div class="editorHeader editorContent">
+        <div class="back" on:click="stepHandler()">Submit another</div>
+        <div class="step">Success</div>
+      </div>
+    </div>
+  {{/if}}
+{{/if}}
+
+<script>
+  import YouTubePlayer from './youtube_player.html';
+  import Post from './post.html';
+  import {API_KEYS} from '../config.js';
+  import fetchival from 'fetchival';
+
+  /**
+   * Converts the time in seconds to a string representing that number of
+   * seconds before midnight. For instance, 61 seconds would be 11:58:59.
+   * @param {number} timeInSeconds The time, in seconds.
+   * @return {string} The timestamp representing that number of seconds
+   *     before midnight.
+   */
+  function toTimestamp(timeInSeconds) {
+    const midnight = 12 * 60 * 60; // midnight, in seconds.
+    let offset = (midnight - timeInSeconds) | 0;
+
+    /**
+     * Pads a string representation of a number to have a leading zero up to
+     * a width of 2.
+     */
+    const pad = (num) => {
+      if (num.length == 1) return '0' + num;
+      return num;
+    };
+
+    const seconds = pad(`${(offset % 60)}`);
+    offset = (offset / 60) | 0;
+    const minutes = pad(`${(offset % 60)}`);
+    offset = (offset / 60) | 0;
+    const hours = pad(`${(offset % 60)}`);
+    return `${hours}:${minutes}:${seconds}`;
+  }
+
+  export default {
+    oncreate() {
+      if (this.store.get('step') == 4) {
+        this.authenticate();
+      }
+    },
+    data() {
+      return {
+        title: '',
+        event: '',
+        countdown: '',
+        time: null,
+        loading: true,
+        ready: false, // Ready to move from step 1 to 2.
+        verifySource: '',
+      };
+    },
+    methods: {
+      reset() {
+        this.store.set({
+          id: null,
+          step: 1,
+        });
+        this.set({
+          title: '',
+          event: '',
+        });
+        this.fire('reset');
+      },
+      stepHandler() {
+        if (this.store.get('step') == 3) {
+          this.store.set({step: 2});
+        } else if (this.store.get('step') == 5) {
+          this.store.set({step: 2});
+        } else {
+          this.reset();
+        }
+      },
+      nextStep() {
+        // Hard-code in setting the step to 2.
+        this.refs.player.pause();
+        this.store.set({step: 2});
+      },
+      setupHandler() {
+        this.set({loading: false});
+        const timeStateChange = () => {
+          const time = this.refs.player.get('currentTime');
+          const state = this.refs.player.get('playerState');
+          if (time != null) {
+            const timestamp = toTimestamp(time);
+            this.set({
+              countdown: timestamp,
+              // Timestamp is set and the player is paused.
+              ready: timestamp != '' && timestamp != '12:00:00' && state == 2,
+              time,
+            });
+          }
+        };
+        this.refs.player.observe('currentTime', timeStateChange);
+        this.refs.player.observe('playerState', timeStateChange);
+
+        this.refs.player.observe('title', (title) => {
+          this.set({title});
+        });
+      },
+      // Selects the entire URL in the disabled input.
+      selectUrl() {
+        // From https://stackoverflow.com/a/1173319
+        if (document.selection) {
+          const range = document.body.createTextRange();
+          range.moveToElementText(this.refs.link);
+          range.select();
+        } else if (window.getSelection) {
+          const range = document.createRange();
+          range.selectNode(this.refs.link);
+          window.getSelection().removeAllRanges();
+          window.getSelection().addRange(range);
+        }
+      },
+      post() {
+        const title = this.get('title');
+        const event = this.get('event');
+        const countdown = this.get('countdown');
+        const time = this.get('time');
+        const random = `${Math.random()}`;
+        const id = this.store.get('id');
+        localStorage.setItem('newyearstimer-redditPost', JSON.stringify({title, event, countdown, time, random, id}));
+
+        const accessToken = localStorage.getItem('newyearstimer-redditAccess');
+        if (accessToken != null) {
+          this.store.set({step: 4});
+          this.submitPost();
+        } else {
+          this.store.set({step: 3});
+        }
+      },
+      verify() {
+        const random = JSON.parse(localStorage.getItem('newyearstimer-redditPost')).random;
+
+        const url = `https://www.reddit.com/api/v1/authorize?client_id=${API_KEYS.redditClient}&response_type=code&state=${random}&redirect_uri=http%3A%2F%2Flocalhost%3A5000&duration=temporary&scope=submit,vote`;
+        window.open(url);
+      },
+
+      authenticate() {
+        const {title, event, countdown, time} = JSON.parse(localStorage.getItem('newyearstimer-redditPost'));
+        this.set({title, event, countdown, time});
+        const accessTokenRequest = fetch('https://www.reddit.com/api/v1/access_token', {
+          method: 'post',
+          headers: {
+            'Content-type': 'application/x-www-form-urlencoded',
+            'Authorization': 'basic ' + btoa(`${API_KEYS.redditClient}:${API_KEYS.redditSecret}`),
+          },
+          body: `grant_type=authorization_code&code=${this.store.get('code')}&redirect_uri=${API_KEYS.redditRedirect}`,
+        }).then((response) => {
+          if (response.status != 200) {
+            this.showAuthFailed();
+            return;
+          }
+          response.json().then((json) => {
+            const accessToken = json.access_token;
+            if (accessToken == null) {
+              this.showAuthFailed();
+              return;
+            }
+            localStorage.setItem('newyearstimer-redditAccess', accessToken);
+            this.submitPost();
+          }).catch((e) => {
+            console.error(e);
+            this.showAuthFailed();
+          });
+        }).catch((e) => {
+          console.error(e);
+          this.showAuthFailed();
+        });
+      },
+
+      submitPost() {
+        const accessToken = localStorage.getItem('newyearstimer-redditAccess');
+        // Post the link
+        fetch('https://oauth.reddit.com/api/submit', {
+          method: 'post',
+          headers: {
+            'Content-type': 'application/x-www-form-urlencoded',
+            'Authorization': `bearer ${accessToken}`,
+          },
+          body: `sr=newyearstimer&kind=link&title=${encodeURIComponent(this.get('redditTitle'))}&url=${encodeURIComponent(this.get('link'))}&flair_id=${encodeURIComponent(API_KEYS.flairId)}&flair_text=${encodeURIComponent(this.get('countdown'))}`,
+        }).then((response) => {
+          if (response.status != 200) {
+            this.showAuthFailed(true);
+            return;
+          }
+          this.store.set({step: 6});
+        }).catch((e) => {
+          console.error(e);
+          this.showAuthFailed(true);
+        });
+      },
+
+      showAuthFailed(submitting = false) {
+        const previous = localStorage.getItem('newyearstimer-redditAccess');
+        localStorage.removeItem('newyearstimer-redditAccess');
+        if (submitting && previous != null) {
+          this.post();
+        } else {
+          this.store.set({step: 5});
+        }
+      },
+    },
+    computed: {
+      redditTitle: (title, event) => {
+        const titleClean = title.replace(/\|/g, '-');
+        const eventClean = event.replace(/\|/g, '-');
+        return `${titleClean} | ${eventClean}`;
+      },
+      link: ($id, time) => {
+        return `https://newyearstimer.com/?v=${$id}&end=${time}`;
+      },
+    },
+    components: {
+      YouTubePlayer,
+      TextView,
+      Post,
+    },
+  };
+</script>
+
+<style>
+  .editorContent {
+    text-align: left;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 0 1em;
+  }
+
+  .back {
+    float: right;
+    color: #EB5757;
+    font-weight: bold;
+    cursor: pointer;
+  }
+
+  .editorInstructions {
+    margin-top: 1em;
+    margin-bottom: 1em;
+  }
+
+  .step {
+    color: #EB5757;
+  }
+
+  .editorNextStep {
+    padding-left: 1em;
+    text-align: right;
+  }
+
+  .timestamp {
+    font-weight: bold;
+  }
+
+  .hidden {
+    display: none;
+  }
+
+  .separator {
+    background: #ec5656;
+    height: 2;
+    margin: 2em;
+  }
+
+  .inputTitle {
+    display: block;
+    font-weight: bold;
+    font-size: 0.9em;
+    color: #464646;
+    margin: 1.5em 0 0.5em 0.5em;
+  }
+
+  .inputRow {
+    margin: 1em 0;
+  }
+
+  .inputRow.previewRow {
+    margin-top: -2em;
+  }
+
+  .subheader {
+    font-size: 1.3em;
+    color: #ec5656;
+    margin: 2em 0 0.5em 0;
+  }
+
+  .editorContent.expanded {
+    margin: 2.5em auto 0 auto;
+  }
+
+  .success {
+    background: #ec5656;
+    color: white;
+    border-radius: 4px;
+    padding: 0.5em 0.5em 2em 0.5em;
+  }
+
+  .success .subheader {
+    color: white;
+    margin-top: 0;
+  }
+
+  .copyBox {
+    text-align: center;
+    color: black;
+    border-bottom: solid 2px #862727;
+    background: white;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    padding: 4px 0 5px 0.5em;
+    overflow: hidden;
+    white-space: nowrap;
+    margin: auto;
+    width: 90%;
+    font-size: 1.1em;
+    letter-spacing: 0.2;
+  }
+
+  sup {
+    color: #ed5555;
+  }
+</style>

@@ -1,0 +1,183 @@
+
+{{#if listing.length > 0}}
+  <a class="action" href="https://www.reddit.com/r/NewYearsTimer/search?q=&restrict_sr=on&sort=relevance&t=all" target="blank_">Search</a>
+{{/if}}
+<div class="mainListing">
+  {{#each listing as child}}
+    <Post votes="{{child.data.score}}"
+          title="{{child.data.title.split(' | ')[0]}}"
+          event="{{child.data.title.split(' | ')[1]}}"
+          id="{{extractId(child.data.url)}}"
+          end="{{extractEnd(child.data.url)}}"
+          countdown="{{child.data.link_flair_text}}"
+          name="{{child.data.name}}"/>
+  {{/each}}
+</div>
+{{#if error}}
+  <p>An unforeseen error occurred</p>
+{{else}}
+  {{#if loading}}
+    <p>Loading...</p>
+  {{/if}}
+{{/if}}
+
+<script>
+  import {API_KEYS} from '../config.js';
+  import fetchival from 'fetchival';
+  import Post from './post.html';
+
+  function extractId(url) {
+    return url.split('?v=')[1].split('&')[0];
+  }
+
+  function extractEnd(url) {
+    return url.replace(/&amp;/g, '&').split('&end=')[1].split('&')[0];
+  }
+
+  export default {
+    data() {
+      return {
+        loading: true,
+        authFailed: false,
+        listing: [],
+        error: null,
+        after: null,
+      };
+    },
+    helpers: {
+      extractId,
+      extractEnd,
+    },
+    components: {
+      Post,
+    },
+    methods: {
+      handleScroll(e) {
+        if (this.get('loading') == false) {
+          const height = document.body.scrollHeight;
+          const pos = document.body.scrollTop + document.body.clientHeight;
+          if (height - pos < 75) {
+            this.set({loading: true});
+            this.getNextPage();
+          }
+        }
+      },
+
+      getNextPage() {
+        const listing = this.get('listing');
+        const after = this.get('after');
+        if (after == null) {
+          this.set({loading: false});
+          return;
+        }
+        if (listing.length == 0) {
+          this.set({error: true});
+          return;
+        }
+        fetch(`https://www.reddit.com/r/NewYearsTimer/.json?count=${encodeURIComponent(listing.length)}&after=${encodeURIComponent(after)}`, {
+          method: 'get',
+        }).then((response) => {
+          if (response.status != 200) {
+            this.set({error: true});
+            return;
+          }
+          response.json().then((json) => {
+            this.set({after: json.data.after});
+            this.addToListing(json.data.children);
+            this.set({loading: false});
+          }).catch((e) => {
+            console.error(e);
+            this.set({error: true});
+          })
+        }).catch((e) => {
+          console.error(e);
+          this.set({error: true});
+        });
+      },
+
+      authenticate() {
+        const accessTokenRequest = fetch('https://www.reddit.com/api/v1/access_token', {
+          method: 'post',
+          headers: {
+            'Content-type': 'application/x-www-form-urlencoded',
+            'Authorization': 'basic ' + btoa(`${API_KEYS.redditClient}:${API_KEYS.redditSecret}`),
+          },
+          body: `grant_type=authorization_code&code=${this.store.get('code')}&redirect_uri=${API_KEYS.redditRedirect}`,
+        }).then((response) => {
+          if (response.status != 200) {
+            this.showAuthFailed();
+            return;
+          }
+          response.json().then((json) => {
+            const accessToken = json.access_token;
+            if (accessToken == null) {
+              this.showAuthFailed();
+              return;
+            }
+            localStorage.setItem('newyearstimer-redditAccess', accessToken);
+            this.store.set({reddit: true});
+          }).catch((e) => {
+            console.error(e);
+            this.showAuthFailed();
+          });
+        }).catch((e) => {
+          console.error(e);
+          this.showAuthFailed();
+        });
+      },
+
+      showAuthFailed() {
+        this.store.set({authFailed: true});
+      },
+
+      addToListing(data) {
+        this.set({listing: this.get('listing').concat(data)});
+      },
+    },
+
+    oncreate() {
+      const bindedScroll = this.handleScroll.bind(this);
+      window.addEventListener('scroll', bindedScroll, false);
+      this.removeScroll = () => window.removeEventListener('scroll', bindedScroll, false);
+
+      fetch('https://www.reddit.com/r/NewYearsTimer/.json', {
+        method: 'get',
+      }).then((response) => {
+        if (response.status != 200) {
+          this.set({error: true});
+          return;
+        }
+        response.json().then((json) => {
+          this.set({after: json.data.after});
+          this.addToListing(json.data.children);
+          this.set({loading: false});
+        }).catch((e) => {
+          console.error(e);
+          this.set({error: true});
+        })
+      }).catch((e) => {
+        console.error(e);
+        this.set({error: true});
+      });
+
+      if (this.store.get('code') != null) {
+        this.authenticate();
+      }
+    },
+
+    ondestroy() {
+      this.removeScroll();
+    },
+  };
+</script>
+
+<style>
+  .mainListing {
+    margin: 1em 0;
+    text-align: center;
+  }
+
+  .action {
+    padding-left: 0.5em;
+  }
+</style>

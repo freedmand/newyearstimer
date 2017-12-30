@@ -1,0 +1,296 @@
+<div class="playbackPadding"></div>
+<div class="welcomeActions">
+  <div class="welcomeAction">
+    <span on:click="backToBrowse()">Back to browse</span>
+  </div>
+</div>
+<Clock ref:clock :trigger :showInfo :playing :testTrigger/>
+<div>
+  <div class='{{blurry ? "blurFg" : ""}}'></div>
+  {{#if $timerBegin && playerState == 2}}
+    <div class="playerMessage" on:click="refs.player.play()">
+      <p>
+        The timer is in effect. You probably want to resume the video!
+      </p>
+      <div class="playerButton">Resume video</div>
+    </div>
+  {{/if}}
+  {{#if !showInfo && !$timerBegin}}
+    <div class="playerMessage" on:click="refs.player.play()">
+      <p>
+        Loading...
+      </p>
+    </div>
+  {{/if}}
+  {{#if showInfo && !$timerBegin}}
+    {{#if !playing}}
+      <div class="playerMessage" on:click="refs.player.play()">
+        <p>
+          Due to playback limitations on your device, the timer will not work
+          automatically until you initiate playback once.
+          Click to play the video now, and then press &ldquo;Done&rdquo;.
+        </p>
+        <div class="playerButton">Play video, then press done</div>
+      </div>
+    {{else}}
+      <div class="playerMessage">
+        <p>
+          Sit back! The video will automatically start in {{friendlyTime}}.
+        </p>
+        <p>
+          {{friendlyTimestamp}} into the video, something special will happen to
+          signal the new year. Make sure to leave the tab open.
+        </p>
+      </div>
+    {{/if}}
+  {{/if}}
+  {{#if specificCount >= 1 && specificCount <= 10}}
+    <div class="specificCount">{{specificCount}}</div>
+  {{elseif specificCount == 0}}
+    <div class="specificCount small">Happy New Year</div>
+  {{/if}}
+  <YouTubePlayer ref:player id="{{$playbackId}}" controls=0 mute=true loop=1 blurry="{{blurry || ($timerBegin && playerState == 2)}}"/>
+</div>
+
+<script>
+  import YouTubePlayer from './youtube_player.html';
+  import Clock from './clock.html';
+
+  function friendlyMillis(ms) {
+    if (ms < 0) { // Under 0 (this shouldn't happen).
+      return '';
+    }
+    if (ms < 1000 * 60) { // Under a minute.
+      const component = Math.floor(ms / 1000);
+      return `${component} second${component != 1 ? 's' : ''}`;
+    }
+    if (ms < 1000 * 60 * 60) { // Under an hour.
+      const component = Math.floor(ms / 1000 / 60);
+      return `${component} minute${component != 1 ? 's' : ''}`;
+    }
+    if (ms < 1000 * 60 * 60 * 48) { // Under two days.
+      const component = Math.floor(ms / 1000 / 60 / 60);
+      return `${component} hour${component != 1 ? 's' : ''}`;
+    }
+    // Otherwise, return number of days.
+    const component = Math.floor(ms / 1000 / 60 / 60 / 24);
+    return `${component} day${component != 1 ? 's' : ''}`;
+  }
+
+  function friendlyTimestamp(timeInSeconds) {
+    const seconds = Math.floor(timeInSeconds) % 60;
+    const minutes = Math.floor((timeInSeconds / 60) % 60);
+    const hours = Math.floor(timeInSeconds / 3600);
+
+    if (hours == 0) {
+      if (minutes == 0) {
+        return `${seconds} second${seconds != 1 ? 's' : ''}`;
+      } else {
+        return `${minutes} minute${minutes != 1 ? 's' : ''} and ${seconds} second${seconds != 1 ? 's' : ''}`;
+      }
+    } else {
+      if (minutes == 0) {
+        return `${hours} hour${hours != 1 ? 's' : ''} and ${seconds} second${seconds != 1 ? 's' : ''}`;
+      } else {
+        return `${hours} hour${hours != 1 ? 's' : ''}, ${minutes} minute${minutes != 1 ? 's' : ''}, and ${seconds} second${seconds != 1 ? 's' : ''}`;
+      }
+    }
+  }
+
+  export default {
+    data() {
+      return {
+        player: null,
+        playing: true,
+        showInfo: false,
+        friendlyTime: '',
+        friendlyTimestamp: '',
+        trigger: null,
+        testTrigger: null,
+        specificCount: null,
+        playerState: -1,
+        blurry: true,
+      };
+    },
+
+    oncreate() {
+      this.set({
+        friendlyTimestamp: friendlyTimestamp(this.store.get('playbackEnd')),
+      });
+      this.store.set({
+        timerBegin: false,
+      });
+
+      // Calculate midnight on New Year's Eve.
+      const nye = new Date(new Date().getFullYear() + 1, 0, 1, 0, 0, 0);
+      this.set({
+        trigger: nye,
+        testTrigger: new Date(nye.getTime() - this.store.get('playbackEnd') * 1000 - 5000),
+      });
+
+      this.refs.player.on('loaded', () => {
+        if (this.refs.player.get('playerState') != 1) this.set({playing: false});
+        setTimeout(() => this.set({showInfo: true}), 2000);
+      });
+      this.refs.player.on('state', () => {
+        const playerState = this.refs.player.get('playerState');
+        this.set({playerState});
+        if (playerState == 1) this.set({playing: true});
+      });
+
+      this.refs.clock.observe('time', (time) => {
+        const tillNye = nye - this.refs.clock.get('effectiveTime').getTime();
+        const millisRemaining = tillNye - this.store.get('playbackEnd') * 1000;
+        const actualMillisRemaining = nye - Date.now() - this.store.get('playbackEnd') * 1000;
+        this.store.set({'actualTimerBegin': actualMillisRemaining < 5000});
+        if (!this.store.get('timerBegin')) {
+          if (millisRemaining > 250) {
+            this.set({
+              friendlyTime: friendlyMillis(millisRemaining),
+            });
+          } else {
+            this.beginTimer();
+          }
+        } else {
+          if (millisRemaining > 500) {
+            this.stopTimer();
+          }
+        }
+
+        // If there's 10 or fewer seconds remaining.
+        if (tillNye / 1000 <= 10 && tillNye / 1000 > -5) {
+          if (tillNye <= 0) {
+            this.set({specificCount: 0});
+          } else {
+            this.set({specificCount: Math.ceil(tillNye / 1000)});
+          }
+        } else {
+          this.set({specificCount: null});
+        }
+      });
+    },
+
+    methods: {
+      backToBrowse() {
+        // Set the URL back to normal.
+        if (history.pushState) {
+          const path = `${window.location.protocol}//${window.location.host}${window.location.pathname}`;
+          window.history.pushState({path}, '', path);
+        }
+        this.store.set({playing: false});
+      },
+
+      beginTimer() {
+        this.store.set({
+          timerBegin: true,
+        });
+        const player = this.refs.player;
+        this.set({blurry: false});
+        player.set({
+          sync: this.get('trigger') - this.store.get('playbackEnd') * 1000,
+          clock: this.refs.clock,
+        });
+        player.seek(0);
+        player.unmute();
+        player.play();
+      },
+
+      stopTimer() {
+        this.store.set({timerBegin: false});
+        const player = this.refs.player;
+        this.set({blurry: true});
+        player.set({
+          sync: null,
+        });
+        player.mute();
+      },
+    },
+
+    components: {
+      YouTubePlayer,
+      Clock,
+    },
+  };
+</script>
+
+<style>
+
+  .blurFg {
+    position: absolute;
+    width: 100%;
+    padding-bottom: 60.24%;
+    background: #0000008c;
+    backdrop-filter: blur(25px);
+    -webkit-backdrop-filter: blur(25px);
+  }
+
+  .playerMessage {
+    position: absolute;
+    color: white;
+    width: 80%;
+    padding: 0 2em;
+    line-height: 1.4;
+    max-width: 600px;
+  }
+
+  .playerButton {
+    background: #ed5555;
+    color: white;
+    display: inline-block;
+    padding: 0.5em;
+    border-radius: 4px;
+    box-shadow: 0 0 12px black;
+    cursor: pointer;
+  }
+
+  .specificCount {
+    color: white;
+    font-size: 165px;
+    position: absolute;
+    text-align: center;
+    z-index: 8;
+    text-shadow: 0 0 10px black;
+    font-weight: bold;
+    -webkit-text-stroke: 3px black;
+    pointer-events: none;
+    width: 100%;
+    max-width: 800px;
+  }
+
+  .specificCount.small {
+    font-size: 80px;
+    line-height: 1.2;
+  }
+
+  .playbackPadding {
+    margin-top: 1.5em;
+  }
+
+@media only screen and (min-width: 800px)  {
+  .blurFg {
+    width: 800px;
+    padding-bottom: inherit;
+    height: 481.92px;
+  }
+  .specificCount {
+    font-size: 300px;
+  }
+  .specificCount.small {
+    font-size: 180px;
+  }
+}
+
+@media only screen and (min-width: 570px)  {
+  .playerMessage {
+    font-size: 1.4em;
+    padding-top: 1em;
+  }
+  .specificCount {
+    font-size: 220px;
+  }
+  .specificCount.small {
+    font-size: 110px;
+  }
+}
+
+</style>

@@ -1,0 +1,78 @@
+<div class="userpostContainer">
+  {{#if $id == null}}
+  <div class="userpost">
+    <div class="message">Make your own</div>
+    <input placeholder="Paste YouTube link here" bind:value="youTube">
+    <button disabled='{{extractId(youTube) == null}}'
+            on:click="go()">Go</button>
+  </div>
+  {{/if}}
+  <YouTubeEditor ref:editor id="{{$id}}" on:reset="resetId()"/>
+</div>
+{{#if $reddit}}
+  <div class="notification">You are now logged in and can post / vote.</div>
+{{elseif $authFailed}}
+  <div class="notification bad">Reddit authentication failed.</div>
+{{/if}}
+
+<script>
+  import YouTubeEditor from './youtube_editor.html';
+
+  // From https://stackoverflow.com/a/8260383
+  const youTubeRegExp =
+      /.*(?:youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=)([^#\&\?]*).*/;
+
+   /**
+    * Returns the YouTube ID from the given URL.
+    * @param {string} youTubeUrl A full YouTube URL.
+    * @return {?string} The YouTube ID from the URL, or null if none was
+    *     found.
+    */
+  function extractId(youTubeUrl) {
+    const match = youTubeUrl.match(youTubeRegExp);
+    if (match && match[1].length == 11) {
+      return match[1];
+    }
+    return null;
+  }
+
+  export default {
+    data() {
+      return {
+        youTube: '',
+      };
+    },
+    helpers: {
+      extractId,
+    },
+    methods: {
+      go: function() {
+        this.store.set({id: extractId(this.get('youTube'))});
+      },
+      resetId() {
+        this.set({youTube: ''});
+        this.store.set({id: null});
+      },
+    },
+    components: {
+      YouTubeEditor,
+    }
+  };
+</script>
+
+<style>
+  .userpostContainer {
+    padding: 1em 0;
+    margin: 0 0 2em 0;
+    border-top: solid 2px Black;
+    border-bottom: solid 1px Black;
+    background: #f5f5f5;
+    text-align: center;
+  }
+
+  .notification {
+    text-align: center;
+    opacity: 0.5;
+    padding: 0 0 0.5em 0;
+  }
+</style>

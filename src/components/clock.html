@@ -1,0 +1,189 @@
+<div class='clockContainer {{test ? "test" : ""}}'>
+  <p class="info">
+    A timer is set so that something special will happen at midnight on New
+    Year&rsquo;s Eve.
+  </p>
+
+  <div class='clock {{test ? "test" : ""}}'>
+    <div class="date">
+      {{{date}}}
+      {{#if test}}
+        (Fake Time)
+      {{/if}}
+    </div>
+    <div class="time">
+      <div class="component">{{{hours}}}</div>
+      <div class="separator">:</div>
+      <div class="component">{{{minutes}}}</div>
+      <div class="separator">:</div>
+      <div class="component">{{{seconds}}}</div>
+      <div class="component amPm">{{{amPm}}}</div>
+    </div>
+    {{#if showInfo && playing && !$actualTimerBegin}}
+      <div class="actions">
+        {{#if test}}
+          <span class="action" on:click="jumpTime()">Skip to 11:59:45</span>
+        {{/if}}
+        <span class="action" on:click="testTime()">
+          {{#if test}}
+            Stop testing
+          {{else}}
+            Test the timer
+          {{/if}}
+        </span>
+      </div>
+    {{else}}
+      <div class="actions">
+        <span class="action">&nbsp;</span>
+      </div>
+    {{/if}}
+  </div>
+</div>
+
+<script>
+  function zeroPad(x) {
+    x = '' + x;
+    if (x.length == 1) return '0' + x;
+    return x;
+  }
+
+  export default {
+    data () {
+      return {
+        time: new Date(),
+        test: false,
+        timeShift: 0,
+        trigger: null,
+        testTrigger: null,
+        showInfo: false,
+        playing: false,
+      };
+    },
+
+    methods: {
+      testTime() {
+        const testMode = !this.get('test');
+        this.set({
+          test: testMode,
+          timeShift: testMode ? this.get('testTrigger').getTime() - this.get('time').getTime() : 0,
+        });
+      },
+      jumpTime() {
+        const timeShift = this.get('trigger').getTime() - this.get('time').getTime() - 15 * 1000;
+        this.set({timeShift});
+      },
+    },
+
+    computed: {
+      date: effectiveTime => effectiveTime.toDateString(),
+      hours: effectiveTime => {
+        const hours = effectiveTime.getHours() % 12;
+        if (hours == 0) return 12;
+        return zeroPad(hours);
+      },
+      minutes: effectiveTime => zeroPad(effectiveTime.getMinutes()),
+      seconds: effectiveTime => zeroPad(effectiveTime.getSeconds()),
+      amPm: effectiveTime => effectiveTime.getHours() < 12 ? 'a.m.' : 'p.m.',
+      effectiveTime: (time, timeShift) => new Date(time.getTime() + timeShift),
+    },
+
+    oncreate () {
+      this.interval = setInterval(() => {
+        this.set({time: new Date()});
+      }, 150);
+    },
+
+    ondestroy () {
+      clearInterval(this.interval);
+    },
+  };
+</script>
+
+<style>
+  .component {
+    display: inline-block;
+    padding: 0.5em 0.2em;
+    width: 33px;
+    text-align: center;
+  }
+
+  .separator {
+    display: inline-block;
+    font-size: 1.3em;
+    font-weight: bold;
+  }
+
+  .date {
+    padding: 0.5em 0.5em 0.3em 0.5em;
+    text-transform: uppercase;
+    font-weight: bold;
+    letter-spacing: 0.05em;
+    color: #ec5656;
+  }
+
+  .clock {
+    color: white;
+    margin: 0.2em 0.5em 0 0.5em;
+  }
+
+  .component.amPm {
+    width: 42px;
+    text-align: left;
+  }
+
+  .info {
+    color: #313131;
+    display: block;
+    padding: 0.8em 1em 0 1em;
+    margin: 0.5em 0 0.5em 0;
+  }
+
+  .actions {
+    color: #ed5555;
+    font-weight: bold;
+    padding: 0.5em 0;
+  }
+
+  .back.actions {
+    padding: 0.5em 0 0 0;
+  }
+
+  .action {
+    padding: 0.5em;
+    cursor: pointer;
+  }
+
+  .action.disabled {
+    opacity: 0.5;
+    cursor: inherit;
+  }
+
+  .timerTrigger {
+    width: 214px;
+    padding: 0.5em 0;
+  }
+
+  .extraBottom {
+    padding-bottom: 0.5em;
+  }
+
+  .clockType {
+    text-transform: uppercase;
+    font-weight: bold;
+    padding-bottom: 0.3em;
+    font-size: 0.9em;
+    text-shadow: 0px 0px 5px black;
+  }
+
+  .time {
+    background: #ec5656;
+  }
+
+  .test .time {
+    background: #d000ff;
+  }
+
+  .test .date, .test .actions {
+    color: #d000ff;
+  }
+</style>

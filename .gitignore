@@ -1,0 +1,14 @@
+.netlify
+.DS_Store
+config.js
+
+package-lock.json
+node_modules
+.vscode
+test
+bundle.js
+bundle.js.map
+bundle.css
+bundle.css.map
+dist
+tmp

@@ -1,0 +1,112 @@
+body, html {
+  margin: 0 0 2em 0;
+  padding: 0;
+  font-family: Roboto, Helvetica, sans-serif;
+}
+
+.header {
+  text-align: center;
+  margin-top: 2em;
+}
+
+.header svg {
+  width: 100%;
+  height: auto;
+}
+
+.content {
+  width: 100%;
+  margin: auto;
+}
+
+.welcome {
+  margin: 1em 0;
+  line-height: 1.5;
+  color: #2b2b2b;
+  padding: 0.5em 1em;
+}
+
+button:disabled {
+  background: white;
+  color: #ec5656;
+  cursor: inherit;
+}
+
+button {
+  background: #ec5656;
+  color: White;
+  border: solid 1px #ec5656;
+  outline: none;
+  font-size: 1.5em;
+  border-radius: 5px;
+  padding: 0.2em 1em;
+  margin: 0.5em;
+  cursor: pointer;
+}
+
+.message {
+  display: inline-block;
+  font-size: 1.2em;
+}
+
+input {
+  padding: 0 0.5em;
+  margin: 0.5em;
+  font-size: 1.1em;
+  width: 85%;
+  outline: none;
+  border: none;
+  border-bottom: solid 1px gray;
+  color: #2f2f2f;
+  background: transparent;
+}
+
+input::placeholder {
+  color: #a5a5a5
+}
+
+.inline {
+  border-bottom: solid 1px gray;
+  color: gray;
+}
+
+.inline[disabled] {
+  color: #484848;
+  border: none;
+  font-style: italic;
+}
+
+iframe {
+  background: Black;
+}
+
+.welcomeActions {
+  margin: 0.5em 0.5em 0.5em 0.5em;
+  text-align: left;
+}
+
+.welcomeActions.right {
+  text-align: right;
+}
+
+.welcomeAction {
+  display: inline-block;
+  margin: 0 0.5em;
+}
+
+.welcomeActions a, .welcomeActions span, a {
+  color: #ec5656;
+  font-weight: bold;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+@media only screen and (min-width: 800px)  {
+  .content {
+    width: 800px;
+  }
+
+  .header svg {
+    width: 800px;
+  }
+}

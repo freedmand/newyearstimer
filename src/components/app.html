@@ -1,0 +1,20 @@
+{{#if $playing}}
+  <YouTubeTimer/>
+{{else}}
+  <UserPost ref:userpost/>
+  <Listing ref:listing/>
+{{/if}}
+
+<script>
+  import UserPost from './userpost.html';
+  import Listing from './listing.html';
+  import YouTubeTimer from './youtube_timer.html';
+
+  export default {
+    components: {
+      UserPost,
+      Listing,
+      YouTubeTimer,
+    },
+  };
+</script>
